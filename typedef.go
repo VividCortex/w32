@@ -218,6 +218,19 @@ type (
 	WPARAM          uintptr
 )
 
+// https://msdn.microsoft.com/en-us/library/windows/desktop/aa366770(v=vs.85).aspx
+type LPMEMORYSTATUSEX struct {
+	dwLength                uint32
+	dwMemoryLoad            uint32
+	UllTotalPhys            uint64
+	UllAvailPhys            uint64
+	UllTotalPageFile        uint64
+	UllAvailPageFile        uint64
+	UllTotalVirtual         uint64
+	UllAvailVirtual         uint64
+	UllAvailExtendedVirtual uint64
+}
+
 // http://msdn.microsoft.com/en-us/library/windows/desktop/dd162805.aspx
 type POINT struct {
 	X, Y int32

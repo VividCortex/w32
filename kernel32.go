@@ -17,12 +17,14 @@ var (
 	procGetConsoleWindow           = modkernel32.NewProc("GetConsoleWindow")
 	procGetCurrentThread           = modkernel32.NewProc("GetCurrentThread")
 	procGetLogicalDrives           = modkernel32.NewProc("GetLogicalDrives")
+	procGetLogicalDriveStrings     = modkernel32.NewProc("GetLogicalDriveStringsA")
 	procGetUserDefaultLCID         = modkernel32.NewProc("GetUserDefaultLCID")
 	procLstrlen                    = modkernel32.NewProc("lstrlenW")
 	procLstrcpy                    = modkernel32.NewProc("lstrcpyW")
 	procGlobalAlloc                = modkernel32.NewProc("GlobalAlloc")
 	procGlobalFree                 = modkernel32.NewProc("GlobalFree")
 	procGlobalLock                 = modkernel32.NewProc("GlobalLock")
+	procGlobalMemoryStatusEx       = modkernel32.NewProc("GlobalMemoryStatusEx")
 	procGlobalUnlock               = modkernel32.NewProc("GlobalUnlock")
 	procMoveMemory                 = modkernel32.NewProc("RtlMoveMemory")
 	procFindResource               = modkernel32.NewProc("FindResourceW")
@@ -43,6 +45,7 @@ var (
 	procGetProcessTimes            = modkernel32.NewProc("GetProcessTimes")
 	procSetSystemTime              = modkernel32.NewProc("SetSystemTime")
 	procGetSystemTime              = modkernel32.NewProc("GetSystemTime")
+	procFileTimeToSystemTime       = modkernel32.NewProc("FileTimeToSystemTime")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -81,6 +84,14 @@ func GetLogicalDrives() uint32 {
 	ret, _, _ := procGetLogicalDrives.Call()
 
 	return uint32(ret)
+}
+
+func GetLogicalDriveStrings() (uint32, []byte) {
+	lpBuffer := [512]byte{}
+	lpBuffer[0] = 0
+	ret, _, _ := procGetLogicalDriveStrings.Call(uintptr(len(lpBuffer)-1), uintptr(unsafe.Pointer(&lpBuffer)))
+
+	return uint32(ret), lpBuffer[:]
 }
 
 func GetUserDefaultLCID() uint32 {
@@ -129,6 +140,14 @@ func GlobalLock(hMem HGLOBAL) unsafe.Pointer {
 	}
 
 	return unsafe.Pointer(ret)
+}
+
+func GlobalMemoryStatusEx(lpBuffer *LPMEMORYSTATUSEX) bool {
+	// Set the size of the input struct before calling api func
+	lpBuffer.dwLength = uint32(unsafe.Sizeof(*lpBuffer))
+	ret, _, _ := procGlobalMemoryStatusEx.Call(uintptr(unsafe.Pointer(lpBuffer)))
+
+	return ret != 0
 }
 
 func GlobalUnlock(hMem HGLOBAL) bool {
@@ -310,4 +329,14 @@ func SetSystemTime(time *SYSTEMTIME) bool {
 	ret, _, _ := procSetSystemTime.Call(
 		uintptr(unsafe.Pointer(time)))
 	return ret != 0
+}
+
+func FileTimeToSystemTime(time *FILETIME) (bool, *SYSTEMTIME) {
+	var sysTime SYSTEMTIME
+	ret, _, _ := procFileTimeToSystemTime.Call(
+		uintptr(unsafe.Pointer(time)),
+		uintptr(unsafe.Pointer(&sysTime)),
+	)
+
+	return ret != 0, &sysTime
 }
