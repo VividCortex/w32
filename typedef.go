@@ -929,3 +929,15 @@ type KBDLLHOOKSTRUCT struct {
 }
 
 type HOOKPROC func(int, WPARAM, LPARAM) LRESULT
+
+// https://msdn.microsoft.com/en-us/library/windows/desktop/aa373048(v=vs.85).aspx
+type PDH_FMT_COUNTERVALUE_ITEM struct {
+	Name string
+	Item PDH_FMT_COUNTERVALUE
+}
+
+// https://msdn.microsoft.com/en-us/library/windows/desktop/aa373050(v=vs.85).aspx
+type PDH_FMT_COUNTERVALUE struct {
+	Status uint32
+	Value  float64
+}
