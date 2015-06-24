@@ -75,6 +75,7 @@ var (
 	procPdhEnumObjects              = modpdh.NewProc("PdhEnumObjectsA")
 	procPdhEnumObjectItems          = modpdh.NewProc("PdhEnumObjectItemsA")
 	procPdhOpenQuery                = modpdh.NewProc("PdhOpenQueryA")
+	procPdhCloseQuery                = modpdh.NewProc("PdhCloseQuery")
 	procPdhAddCounter               = modpdh.NewProc("PdhAddCounterA")
 	procPdhCollectQueryData         = modpdh.NewProc("PdhCollectQueryData")
 	procPdhValidatePath             = modpdh.NewProc("PdhValidatePathA")
@@ -229,6 +230,14 @@ func PdhOpenQuery() (uint32, HANDLE) {
 	)
 
 	return uint32(ret), pdhQuery
+}
+
+func PdhCloseQuery(pdhQuery HANDLE) uint32 {
+	ret, _, _ := procPdhCloseQuery.Call(
+		uintptr(pdhQuery),
+	)
+
+	return uint32(ret)
 }
 
 func PdhAddCounter(pdhQuery HANDLE, counterPath string) (uint32, HANDLE) {
