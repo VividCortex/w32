@@ -293,8 +293,6 @@ func PdhGetFormattedCounterArray(hCounter HANDLE) (status uint32,
 		return
 	}
 
-	fmt.Println("buffersize: ", respLen)
-
 	itemBuffer := C.getCounterValueBuffer(C.DWORD(respLen))
 	defer C.free(unsafe.Pointer(itemBuffer))
 

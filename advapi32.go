@@ -150,7 +150,7 @@ func RegSetString(hKey HKEY, subKey string, value string) (errno int) {
 		uintptr(0),
 		uintptr(REG_SZ),
 		uintptr(vptr),
-		uintptr(unsafe.Sizeof(buf) + 2)) // 2 is the size of the terminating null character
+		uintptr(unsafe.Sizeof(buf)+2)) // 2 is the size of the terminating null character
 
 	return int(ret)
 }
