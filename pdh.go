@@ -96,7 +96,7 @@ func (err *PDH_ERROR) String() string {
 	return err.Description
 }
 
-func PdhErrorCode(sCode uint32) *PDH_ERROR {
+func PdhErrorCode(sCode uint32) error {
 	switch sCode {
 	case 0:
 		return nil
