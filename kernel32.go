@@ -43,6 +43,7 @@ var (
 	procSetConsoleTextAttribute    = modkernel32.NewProc("SetConsoleTextAttribute")
 	procGetDiskFreeSpaceEx         = modkernel32.NewProc("GetDiskFreeSpaceExW")
 	procGetProcessTimes            = modkernel32.NewProc("GetProcessTimes")
+	procGetProcessIoCounters       = modkernel32.NewProc("GetProcessIoCounters")
 	procSetSystemTime              = modkernel32.NewProc("SetSystemTime")
 	procGetSystemTime              = modkernel32.NewProc("GetSystemTime")
 	procFileTimeToSystemTime       = modkernel32.NewProc("FileTimeToSystemTime")
@@ -215,6 +216,12 @@ func GetLastError() uint32 {
 	return uint32(ret)
 }
 
+const (
+	PROCESS_QUERY_INFORMATION         = 0x0400
+	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	PROCESS_VM_READ                   = 0x0010
+)
+
 func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) HANDLE {
 	inherit := 0
 	if inheritHandle {
@@ -287,6 +294,16 @@ func GetProcessTimes(hProcess HANDLE, lpCreationTime, lpExitTime, lpKernelTime, 
 		uintptr(unsafe.Pointer(lpUserTime)))
 
 	return ret != 0
+}
+
+func GetProcessIoCounters(hprocess HANDLE) (IO_COUNTERS, bool) {
+	output := IO_COUNTERS{}
+	ret, _, _ := procGetProcessIoCounters.Call(
+		uintptr(hprocess),
+		uintptr(unsafe.Pointer(&output)),
+	)
+
+	return output, ret != 0
 }
 
 func GetConsoleScreenBufferInfo(hConsoleOutput HANDLE) *CONSOLE_SCREEN_BUFFER_INFO {

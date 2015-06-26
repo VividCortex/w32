@@ -941,3 +941,12 @@ type PDH_FMT_COUNTERVALUE struct {
 	Status uint32
 	Value  float64
 }
+
+type IO_COUNTERS struct {
+	ReadOperationCount  uint64
+	WriteOperationCount uint64
+	OtherOperationCount uint64
+	ReadTransferCount   uint64
+	WriteTransferCount  uint64
+	OtherTransferCount  uint64
+}

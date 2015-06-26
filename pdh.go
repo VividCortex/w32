@@ -75,7 +75,7 @@ var (
 	procPdhEnumObjects              = modpdh.NewProc("PdhEnumObjectsA")
 	procPdhEnumObjectItems          = modpdh.NewProc("PdhEnumObjectItemsA")
 	procPdhOpenQuery                = modpdh.NewProc("PdhOpenQueryA")
-	procPdhCloseQuery                = modpdh.NewProc("PdhCloseQuery")
+	procPdhCloseQuery               = modpdh.NewProc("PdhCloseQuery")
 	procPdhAddCounter               = modpdh.NewProc("PdhAddCounterA")
 	procPdhCollectQueryData         = modpdh.NewProc("PdhCollectQueryData")
 	procPdhValidatePath             = modpdh.NewProc("PdhValidatePathA")

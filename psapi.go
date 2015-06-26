@@ -12,7 +12,8 @@ import (
 var (
 	modpsapi = syscall.NewLazyDLL("psapi.dll")
 
-	procEnumProcesses = modpsapi.NewProc("EnumProcesses")
+	procEnumProcesses        = modpsapi.NewProc("EnumProcesses")
+	procGetProcessMemoryInfo = modpsapi.NewProc("GetProcessMemoryInfo")
 )
 
 func EnumProcesses(processIds []uint32, cb uint32, bytesReturned *uint32) bool {
@@ -22,4 +23,29 @@ func EnumProcesses(processIds []uint32, cb uint32, bytesReturned *uint32) bool {
 		uintptr(unsafe.Pointer(bytesReturned)))
 
 	return ret != 0
+}
+
+func GetProcessMemoryInfo(process HANDLE) (PROCESS_MEMORY_COUNTERS, bool) {
+	output := PROCESS_MEMORY_COUNTERS{}
+	cb := unsafe.Sizeof(output)
+	ret, _, _ := procGetProcessMemoryInfo.Call(
+		uintptr(process),
+		uintptr(unsafe.Pointer(&output)),
+		cb,
+	)
+
+	return output, ret != 0
+}
+
+type PROCESS_MEMORY_COUNTERS struct {
+	Cb                         uint32
+	PageFaultCount             uint32
+	PeakWorkingSetSize         uintptr
+	WorkingSetSize             uintptr
+	QuotaPeakPagedPoolUsage    uintptr
+	QuotaPagedPoolUsage        uintptr
+	QuotaPeakNonPagedPoolUsage uintptr
+	QuotaNonPagedPoolUsage     uintptr
+	PagefileUsage              uintptr
+	PeakPagefileUsage          uintptr
 }
