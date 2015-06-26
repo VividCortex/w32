@@ -222,7 +222,7 @@ const (
 	PROCESS_VM_READ                   = 0x0010
 )
 
-func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) HANDLE {
+func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) (HANDLE, bool) {
 	inherit := 0
 	if inheritHandle {
 		inherit = 1
@@ -232,7 +232,7 @@ func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) HAN
 		uintptr(desiredAccess),
 		uintptr(inherit),
 		uintptr(processId))
-	return HANDLE(ret)
+	return HANDLE(ret), ret != 0
 }
 
 func TerminateProcess(hProcess HANDLE, uExitCode uint) bool {

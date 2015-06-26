@@ -12,8 +12,9 @@ import (
 var (
 	modpsapi = syscall.NewLazyDLL("psapi.dll")
 
-	procEnumProcesses        = modpsapi.NewProc("EnumProcesses")
-	procGetProcessMemoryInfo = modpsapi.NewProc("GetProcessMemoryInfo")
+	procEnumProcesses           = modpsapi.NewProc("EnumProcesses")
+	procGetProcessMemoryInfo    = modpsapi.NewProc("GetProcessMemoryInfo")
+	procGetProcessImageFileName = modpsapi.NewProc("GetProcessImageFileNameA")
 )
 
 func EnumProcesses(processIds []uint32, cb uint32, bytesReturned *uint32) bool {
@@ -23,6 +24,17 @@ func EnumProcesses(processIds []uint32, cb uint32, bytesReturned *uint32) bool {
 		uintptr(unsafe.Pointer(bytesReturned)))
 
 	return ret != 0
+}
+
+func GetProcessImageFileName(hProcess HANDLE) (string, bool) {
+	buf := make([]byte, 1024)
+	ret, _, _ := procGetProcessImageFileName.Call(
+		uintptr(hProcess),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(uint32(len(buf))),
+	)
+
+	return string(buf[:ret]), ret != 0
 }
 
 func GetProcessMemoryInfo(process HANDLE) (PROCESS_MEMORY_COUNTERS, bool) {
