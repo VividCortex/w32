@@ -71,6 +71,8 @@ const (
 	ERROR_NOT_SUPPORTED       = 50
 )
 
+var tcp4RowSize = uint32(unsafe.Sizeof(MIB_TCPROW{}))
+
 func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 	sort := FALSE
 	if sortResults {
@@ -88,7 +90,8 @@ func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 		return
 	}
 
-	tableBuf := C.GetTcpTableBuffer(C.DWORD(bufSize))
+	// Allocate our table with a buffer for a few extra rows, just in case
+	tableBuf := C.GetTcpTableBuffer(C.DWORD(bufSize + tcp4RowSize*20))
 	defer C.free(unsafe.Pointer(tableBuf))
 
 	ret, _, _ = procGetTcpTable.Call(
@@ -123,11 +126,13 @@ func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 	return
 }
 
+// https://msdn.microsoft.com/en-us/library/aa366917(v=vs.85).aspx
 type MIB_TCPTABLE struct {
 	NumEntries uint32
 	Table      []MIB_TCPROW
 }
 
+// https://msdn.microsoft.com/en-us/library/aa366909(v=vs.85).aspx
 type MIB_TCPROW struct {
 	State      uint32
 	LocalAddr  uint32
@@ -135,6 +140,8 @@ type MIB_TCPROW struct {
 	RemoteAddr uint32
 	RemotePort uint32
 }
+
+var tcp6RowSize = uint32(unsafe.Sizeof(MIB_TCP6ROW{}))
 
 func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 	sort := FALSE
@@ -153,7 +160,8 @@ func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 		return
 	}
 
-	tableBuf := C.GetTcp6TableBuffer(C.DWORD(bufSize))
+	// Allocate our table with a buffer for a few extra rows, just in case
+	tableBuf := C.GetTcp6TableBuffer(C.DWORD(bufSize + tcp6RowSize*20))
 	defer C.free(unsafe.Pointer(tableBuf))
 
 	ret, _, _ = procGetTcp6Table.Call(
@@ -189,12 +197,6 @@ func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 
 	return
 }
-
-//ULONG WINAPI GetTcp6Table(
-//  _Out_   PMIB_TCP6TABLE TcpTable,
-//  _Inout_ PULONG         SizePointer,
-//  _In_    BOOL           Order
-//);
 
 // https://msdn.microsoft.com/en-us/library/aa814506(v=vs.85).aspx
 type MIB_TCP6TABLE struct {
