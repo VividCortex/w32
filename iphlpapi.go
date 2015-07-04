@@ -61,8 +61,10 @@ import (
 var (
 	modiphlpapi = syscall.NewLazyDLL("Iphlpapi.dll")
 
-	procGetTcpTable  = modiphlpapi.NewProc("GetTcpTable")
-	procGetTcp6Table = modiphlpapi.NewProc("GetTcp6Table")
+	procGetIpStatisticsEx  = modiphlpapi.NewProc("GetIpStatisticsEx")
+	procGetTcpStatisticsEx = modiphlpapi.NewProc("GetTcpStatisticsEx")
+	procGetTcpTable        = modiphlpapi.NewProc("GetTcpTable")
+	procGetTcp6Table       = modiphlpapi.NewProc("GetTcp6Table")
 )
 
 const (
@@ -70,6 +72,79 @@ const (
 	ERROR_INVALID_PARAMETER   = 87
 	ERROR_NOT_SUPPORTED       = 50
 )
+
+func GetIpStatisticsEx(ipv6 bool) (MIB_IPSTATS, bool) {
+	ipFamily := 2 // AF_INET
+	if ipv6 {
+		ipFamily = 23 // AF_INET6
+	}
+	stats := MIB_IPSTATS{}
+	ret, _, _ := procGetIpStatisticsEx.Call(
+		uintptr(unsafe.Pointer(&stats)),
+		uintptr(ipFamily),
+	)
+
+	return stats, ret != 0
+}
+
+type MIB_IPSTATS struct {
+	Forwarding      uint32
+	DefaultTTL      uint32
+	InReceives      uint32
+	InHdrErrors     uint32
+	InAddrErrors    uint32
+	ForwDatagrams   uint32
+	InUnknownProtos uint32
+	InDiscards      uint32
+	InDelivers      uint32
+	OutRequests     uint32
+	RoutingDiscards uint32
+	OutDiscards     uint32
+	OutNoRoutes     uint32
+	ReasmTimeout    uint32
+	ReasmReqds      uint32
+	ReasmOks        uint32
+	ReasmFails      uint32
+	FragOks         uint32
+	FragFails       uint32
+	FragCreates     uint32
+	NumIf           uint32
+	NumAddr         uint32
+	NumRoutes       uint32
+}
+
+func GetTcpStatisticsEx(ipv6 bool) (MIB_TCPSTATS, bool) {
+	ipFamily := 2 // AF_INET
+	if ipv6 {
+		ipFamily = 23 // AF_INET6
+	}
+	stats := MIB_TCPSTATS{}
+	ret, _, _ := procGetTcpStatisticsEx.Call(
+		uintptr(unsafe.Pointer(&stats)),
+		uintptr(ipFamily),
+	)
+
+	return stats, ret != 0
+}
+
+// https://msdn.microsoft.com/en-us/library/aa366915(v=vs.85).aspx
+type MIB_TCPSTATS struct {
+	RtoAlgorithm uint32
+	RtoMin       uint32
+	RtoMax       uint32
+	MaxConn      uint32
+	ActiveOpens  uint32
+	PassiveOpens uint32
+	AttemptFails uint32
+	EstabResets  uint32
+	CurrEstab    uint32
+	InSegs       uint32
+	OutSegs      uint32
+	RetransSegs  uint32
+	InErrs       uint32
+	OutRsts      uint32
+	NumConns     uint32
+}
 
 var tcp4RowSize = uint32(unsafe.Sizeof(MIB_TCPROW{}))
 
