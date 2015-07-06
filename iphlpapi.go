@@ -84,7 +84,7 @@ func GetIpStatisticsEx(ipv6 bool) (MIB_IPSTATS, bool) {
 		uintptr(ipFamily),
 	)
 
-	return stats, ret != 0
+	return stats, ret == 0
 }
 
 type MIB_IPSTATS struct {
@@ -124,7 +124,7 @@ func GetTcpStatisticsEx(ipv6 bool) (MIB_TCPSTATS, bool) {
 		uintptr(ipFamily),
 	)
 
-	return stats, ret != 0
+	return stats, ret == 0
 }
 
 // https://msdn.microsoft.com/en-us/library/aa366915(v=vs.85).aspx
