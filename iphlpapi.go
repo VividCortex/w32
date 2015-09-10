@@ -17,7 +17,7 @@ typedef struct _MIB_TCPROW {
 
 typedef struct _MIB_TCPTABLE {
   DWORD      dwNumEntries;
-  MIB_TCPROW table[];
+  //MIB_TCPROW table[];
 } MIB_TCPTABLE, *PMIB_TCPTABLE;
 
 typedef struct _MIB_TCP6ROW {
@@ -32,7 +32,7 @@ typedef struct _MIB_TCP6ROW {
 
 typedef struct _MIB_TCP6TABLE {
   DWORD       dwNumEntries;
-  MIB_TCP6ROW table[];
+  //MIB_TCP6ROW table[];
 } MIB_TCP6TABLE, *PMIB_TCP6TABLE;
 
 MIB_TCP6TABLE* GetTcp6TableBuffer(DWORD buffersize){
@@ -167,10 +167,11 @@ func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 
 	// Allocate our table with a buffer for a few extra rows, just in case
 	tableBuf := C.GetTcpTableBuffer(C.DWORD(bufSize + tcp4RowSize*20))
-	defer C.free(unsafe.Pointer(tableBuf))
+	unsafeTableBuf := unsafe.Pointer(tableBuf)
+	defer C.free(unsafeTableBuf)
 
 	ret, _, _ = procGetTcpTable.Call(
-		uintptr(unsafe.Pointer(tableBuf)),
+		uintptr(unsafeTableBuf),
 		uintptr(unsafe.Pointer(&bufSize)),
 		uintptr(sort),
 	)
@@ -183,7 +184,7 @@ func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 	table.Table = make([]MIB_TCPROW, table.NumEntries)
 
 	buf := *(*[]C.MIB_TCPROW)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(&tableBuf.table)),
+		Data: uintptr(unsafe.Pointer(uintptr(unsafeTableBuf) + C.sizeof_struct__MIB_TCPTABLE)),
 		Len:  int(table.NumEntries),
 		Cap:  int(table.NumEntries),
 	}))
@@ -237,10 +238,11 @@ func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 
 	// Allocate our table with a buffer for a few extra rows, just in case
 	tableBuf := C.GetTcp6TableBuffer(C.DWORD(bufSize + tcp6RowSize*20))
-	defer C.free(unsafe.Pointer(tableBuf))
+	unsafeTableBuf := unsafe.Pointer(tableBuf)
+	defer C.free(unsafeTableBuf)
 
 	ret, _, _ = procGetTcp6Table.Call(
-		uintptr(unsafe.Pointer(tableBuf)),
+		uintptr(unsafeTableBuf),
 		uintptr(unsafe.Pointer(&bufSize)),
 		uintptr(sort),
 	)
@@ -253,7 +255,7 @@ func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 	table.Table = make([]MIB_TCP6ROW, table.NumEntries)
 
 	buf := *(*[]C.MIB_TCP6ROW)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: uintptr(unsafe.Pointer(&tableBuf.table)),
+		Data: uintptr(unsafe.Pointer(uintptr(unsafeTableBuf) + C.sizeof_struct__MIB_TCP6TABLE)),
 		Len:  int(table.NumEntries),
 		Cap:  int(table.NumEntries),
 	}))
