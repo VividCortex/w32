@@ -47,6 +47,7 @@ var (
 	procSetSystemTime              = modkernel32.NewProc("SetSystemTime")
 	procGetSystemTime              = modkernel32.NewProc("GetSystemTime")
 	procFileTimeToSystemTime       = modkernel32.NewProc("FileTimeToSystemTime")
+	procWaitForSingleObject        = modkernel32.NewProc("WaitForSingleObject")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -217,9 +218,37 @@ func GetLastError() uint32 {
 }
 
 const (
-	PROCESS_QUERY_INFORMATION         = 0x0400
-	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-	PROCESS_VM_READ                   = 0x0010
+	// Generic access rights
+	GAR_ALL     = 0x10000000 // All possible access rights
+	GAR_EXECUTE = 0x20000000 // Execute access
+	GAR_WRITE   = 0x40000000 // Write access
+	GAR_READ    = 0x80000000 // Read access
+
+	// Standard access rights
+	SAR_DELETE       = 0x00010000 // The right to delete the object.
+	SAR_READ_CONTROL = 0x00020000 // The right to read the information in the object's security descriptor, not including the information in the system access control list (SACL).
+	SAR_WRITE_DAC    = 0x00040000 // The right to modify the discretionary access control list (DACL) in the object's security descriptor.
+	SAR_WRITE_OWNER  = 0x00080000 // The right to change the owner in the object's security descriptor.
+	SAR_SYNCHRONIZE  = 0x00100000 // The right to use the object for synchronization. This enables a thread to wait until the object is in the signaled state.
+
+	// Security
+	ACCESS_SYSTEM_SECURITY = 0x01000000 // ability to get or set the SACL in an object's security descriptor
+
+	// Process-specific access rights
+	PROCESS_TERMINATE                 = 0x0001 // Required to terminate a process using TerminateProcess.
+	PROCESS_CREATE_THREAD             = 0x0002 // Required to create a thread.
+	PROCESS_SET_SESSIONID             = 0x0004 // [undoc].
+	PROCESS_VM_OPERATION              = 0x0008 // Required to perform an operation on the address space of a process: VirtualProtectEx, WriteProcessMemory.
+	PROCESS_VM_READ                   = 0x0010 // Required to read memory in a process using ReadProcessMemory.
+	PROCESS_VM_WRITE                  = 0x0020 // Required to write to memory in a process using WriteProcessMemory.
+	PROCESS_DUP_HANDLE                = 0x0040 // Required to duplicate a handle using DuplicateHandle.
+	PROCESS_CREATE_PROCESS            = 0x0080 // Required to create a process.
+	PROCESS_SET_QUOTA                 = 0x0100 // Required to set memory limits using SetProcessWorkingSetSize.
+	PROCESS_SET_INFORMATION           = 0x0200 // Required to set certain information about a process, such as its priority class.
+	PROCESS_QUERY_INFORMATION         = 0x0400 // Required to retrieve certain information about a process, such as its token, exit code, and priority class. Implies PROCESS_QUERY_LIMITED_INFORMATION.
+	PROCESS_SUSPEND_RESUME            = 0x0800 // Required to suspend or resume a process.
+	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000 // Required to retrieve certain information about a process: GetExitCodeProcess, GetPriorityClass, IsProcessInJob, QueryFullProcessImageName.
+	PROCESS_SET_LIMITED_INFORMATION   = 0x2000 // [undoc].
 )
 
 func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) (HANDLE, bool) {
@@ -356,4 +385,32 @@ func FileTimeToSystemTime(time *FILETIME) (bool, *SYSTEMTIME) {
 	)
 
 	return ret != 0, &sysTime
+}
+
+// WaitForSingleObject wait duration
+const (
+	WAIT_DONT_WAIT       = 0
+	WAIT_ONE_MILLISECOND = 1
+	WAIT_ONE_SECOND      = 1000
+	WAIT_INFINITE        = 0xFFFFFFFF
+)
+
+// WaitForSingleObject return codes
+const (
+	WAIT_SIGNALED  = 0x00000000
+	WAIT_ABANDONED = 0x00000080
+	WAIT_TIMEOUT   = 0x00000102
+	WAIT_FAILED    = 0xFFFFFFFF
+)
+
+// WaitForSingleObject waits for the object to be signaled.
+// Returns true if the object was signaled, false otherwise.
+// It returns an error when the wait fails for a reason other than the object not being signaled.
+func WaitForSingleObject(object HANDLE, msWait uint32) uint32 {
+	switch res, _, _ := procWaitForSingleObject.Call(uintptr(object), uintptr(msWait)); res {
+	case WAIT_SIGNALED, WAIT_ABANDONED, WAIT_TIMEOUT:
+		return uint32(res)
+	default:
+		return WAIT_FAILED
+	}
 }
