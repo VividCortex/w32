@@ -6,6 +6,7 @@ package w32
 
 import (
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 )
 
@@ -48,6 +49,7 @@ var (
 	procGetSystemTime              = modkernel32.NewProc("GetSystemTime")
 	procFileTimeToSystemTime       = modkernel32.NewProc("FileTimeToSystemTime")
 	procWaitForSingleObject        = modkernel32.NewProc("WaitForSingleObject")
+	procQueryFullProcessImageName  = modkernel32.NewProc("QueryFullProcessImageNameW")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -262,6 +264,26 @@ func OpenProcess(desiredAccess uint32, inheritHandle bool, processId uint32) (HA
 		uintptr(inherit),
 		uintptr(processId))
 	return HANDLE(ret), ret != 0
+}
+
+const ( // for QueryFullProcessImageName
+	PROCESS_NAME_WINPATH = 0x00000000 // C:\Windows\...
+	PROCESS_NAME_NATIVE  = 0x00000001 // \Device\HarddiskVolume3\Windows\...
+)
+
+// Empty string on error.
+func QueryFullProcessImageName(hProcess HANDLE, flags uint32) string {
+	buf := make([]uint16, syscall.MAX_LONG_PATH+1)
+	var bufsiz = uint32(len(buf))
+	ret, _, _ := procQueryFullProcessImageName.Call(
+		uintptr(hProcess),
+		uintptr(flags),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uintptr(unsafe.Pointer(&bufsiz)))
+	if ret == 0 || bufsiz == 0 || bufsiz >= uint32(len(buf)) || buf[0] == 0 { // error
+		return ""
+	}
+	return string(utf16.Decode(buf[:bufsiz]))
 }
 
 func TerminateProcess(hProcess HANDLE, uExitCode uint) bool {
