@@ -19,17 +19,17 @@ const ( // for NtQueryInformationProcess (processInformationClass)
 	ProcessBasicInformation = 0
 )
 
-// byte slice if successful, nil otherwise
-func NtQueryInformationProcess(hProcess HANDLE, processInformationClass int, bufLen int) []byte {
-	buf := make([]byte, bufLen)
-	retLen := uint32(0)
+// []byte if successful, nil otherwise
+func NtQueryInformationProcess(hProcess HANDLE, processInformationClass int, length int) []byte {
+	buf := make([]byte, length)
+	retLen := int(0)
 	ret, _, _ := procNtQueryInformationProcess.Call(
 		uintptr(hProcess),
 		uintptr(processInformationClass),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(len(buf)),
 		uintptr(unsafe.Pointer(&retLen)))
-	if ret != 0 || retLen != uint32(len(buf)) {
+	if ret != 0 || retLen != len(buf) {
 		return nil
 	}
 	return buf
