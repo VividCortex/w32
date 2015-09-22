@@ -50,6 +50,7 @@ var (
 	procFileTimeToSystemTime       = modkernel32.NewProc("FileTimeToSystemTime")
 	procWaitForSingleObject        = modkernel32.NewProc("WaitForSingleObject")
 	procQueryFullProcessImageName  = modkernel32.NewProc("QueryFullProcessImageNameW")
+	procReadProcessMemory          = modkernel32.NewProc("ReadProcessMemory")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -284,6 +285,18 @@ func QueryFullProcessImageName(hProcess HANDLE, flags uint32) string {
 		return ""
 	}
 	return string(utf16.Decode(buf[:bufsiz]))
+}
+
+// returns length bytes, or nil if error
+func ReadProcessMemory(hProcess HANDLE, addr uintptr, length int) []byte {
+	buf := make([]byte, length)
+	read := int(0)
+	ret, _, _ := procReadProcessMemory.Call(uintptr(hProcess), addr,
+		uintptr(unsafe.Pointer(&buf[0])), uintptr(length), uintptr(unsafe.Pointer(&read)))
+	if ret == 0 || read != length {
+		return nil
+	}
+	return buf
 }
 
 func TerminateProcess(hProcess HANDLE, uExitCode uint) bool {
