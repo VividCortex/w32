@@ -16,6 +16,7 @@ var (
 	procGetModuleHandle            = modkernel32.NewProc("GetModuleHandleW")
 	procMulDiv                     = modkernel32.NewProc("MulDiv")
 	procGetConsoleWindow           = modkernel32.NewProc("GetConsoleWindow")
+	procGetCurrentProcess          = modkernel32.NewProc("GetCurrentProcess")
 	procGetCurrentThread           = modkernel32.NewProc("GetCurrentThread")
 	procGetLogicalDrives           = modkernel32.NewProc("GetLogicalDrives")
 	procGetLogicalDriveStrings     = modkernel32.NewProc("GetLogicalDriveStringsA")
@@ -77,6 +78,12 @@ func GetConsoleWindow() HWND {
 	ret, _, _ := procGetConsoleWindow.Call()
 
 	return HWND(ret)
+}
+
+func GetCurrentProcess() HANDLE {
+	ret, _, _ := procGetCurrentProcess.Call()
+
+	return HANDLE(ret)
 }
 
 func GetCurrentThread() HANDLE {
@@ -227,12 +234,17 @@ const (
 	GAR_WRITE   = 0x40000000 // Write access
 	GAR_READ    = 0x80000000 // Read access
 
-	// Standard access rights
+	// Standard access rights - https://msdn.microsoft.com/en-us/library/windows/desktop/aa379607(v=vs.85).aspx
 	SAR_DELETE       = 0x00010000 // The right to delete the object.
 	SAR_READ_CONTROL = 0x00020000 // The right to read the information in the object's security descriptor, not including the information in the system access control list (SACL).
 	SAR_WRITE_DAC    = 0x00040000 // The right to modify the discretionary access control list (DACL) in the object's security descriptor.
 	SAR_WRITE_OWNER  = 0x00080000 // The right to change the owner in the object's security descriptor.
 	SAR_SYNCHRONIZE  = 0x00100000 // The right to use the object for synchronization. This enables a thread to wait until the object is in the signaled state.
+	SAR_READ         = SAR_READ_CONTROL
+	SAR_EXECUTE      = SAR_READ_CONTROL
+	SAR_WRITE        = SAR_READ_CONTROL
+	SAR_REQUIRED     = SAR_DELETE | SAR_READ_CONTROL | SAR_WRITE_DAC | SAR_WRITE_OWNER
+	SAR_ALL          = SAR_REQUIRED | SAR_SYNCHRONIZE
 
 	// Security
 	ACCESS_SYSTEM_SECURITY = 0x01000000 // ability to get or set the SACL in an object's security descriptor
