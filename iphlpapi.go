@@ -8,17 +8,32 @@ package w32
 #include <windows.h>
 
 typedef struct _MIB_TCPROW {
-  DWORD dwState;
-  DWORD dwLocalAddr;
-  DWORD dwLocalPort;
-  DWORD dwRemoteAddr;
-  DWORD dwRemotePort;
+  DWORD     dwState;
+  DWORD     dwLocalAddr;
+  DWORD     dwLocalPort;
+  DWORD     dwRemoteAddr;
+  DWORD     dwRemotePort;
 } MIB_TCPROW, *PMIB_TCPROW;
 
 typedef struct _MIB_TCPTABLE {
-  DWORD      dwNumEntries;
+  DWORD     dwNumEntries;
   //MIB_TCPROW table[];
 } MIB_TCPTABLE, *PMIB_TCPTABLE;
+
+typedef struct _MIB_TCPROW2 {
+  DWORD     dwState;
+  DWORD     dwLocalAddr;
+  DWORD     dwLocalPort;
+  DWORD     dwRemoteAddr;
+  DWORD     dwRemotePort;
+  DWORD     dwOwningPid;
+  DWORD     dwOffloadState;
+} MIB_TCPROW2, *PMIB_TCPROW2;
+
+typedef struct _MIB_TCPTABLE2 {
+  DWORD     dwNumEntries;
+  //MIB_TCPROW2 table[];
+} MIB_TCPTABLE2, *PMIB_TCPTABLE2;
 
 typedef struct _MIB_TCP6ROW {
   int       State;
@@ -31,28 +46,55 @@ typedef struct _MIB_TCP6ROW {
 } MIB_TCP6ROW, *PMIB_TCP6ROW;
 
 typedef struct _MIB_TCP6TABLE {
-  DWORD       dwNumEntries;
+  DWORD     dwNumEntries;
   //MIB_TCP6ROW table[];
 } MIB_TCP6TABLE, *PMIB_TCP6TABLE;
 
-MIB_TCP6TABLE* GetTcp6TableBuffer(DWORD buffersize){
-	 MIB_TCP6TABLE *pTable = NULL;
-	 pTable = (MIB_TCP6TABLE *) malloc(buffersize);
+typedef struct _MIB_TCP6ROW2 {
+  byte      LocalAddr[16];
+  DWORD     dwLocalScopeId;
+  DWORD     dwLocalPort;
+  byte      RemoteAddr[16];
+  DWORD     dwRemoteScopeId;
+  DWORD     dwRemotePort;
+  DWORD     State;
+  DWORD     dwOwningPid;
+  DWORD     dwOffloadState;
+} MIB_TCP6ROW2, *PMIB_TCP6ROW2;
 
-	return pTable;
+typedef struct _MIB_TCP6TABLE2 {
+  DWORD     dwNumEntries;
+  //MIB_TCP6ROW2 table[];
+} MIB_TCP6TABLE2, *PMIB_TCP6TABLE2;
+
+MIB_TCP6TABLE* GetTcp6TableBuffer(DWORD buffersize){
+  MIB_TCP6TABLE *pTable = NULL;
+  pTable = (MIB_TCP6TABLE *) malloc(buffersize);
+  return pTable;
+}
+
+MIB_TCP6TABLE2* GetTcp6Table2Buffer(DWORD buffersize){
+  MIB_TCP6TABLE2 *pTable = NULL;
+  pTable = (MIB_TCP6TABLE2 *) malloc(buffersize);
+  return pTable;
 }
 
 MIB_TCPTABLE* GetTcpTableBuffer(DWORD buffersize){
-	 MIB_TCPTABLE *pTable = NULL;
-	 pTable = (MIB_TCPTABLE *) malloc(buffersize);
+  MIB_TCPTABLE *pTable = NULL;
+  pTable = (MIB_TCPTABLE *) malloc(buffersize);
+  return pTable;
+}
 
-	return pTable;
+MIB_TCPTABLE2* GetTcpTable2Buffer(DWORD buffersize){
+  MIB_TCPTABLE2 *pTable = NULL;
+  pTable = (MIB_TCPTABLE2 *) malloc(buffersize);
+  return pTable;
 }
 */
 import "C"
 
 import (
-	//	"fmt"
+	//      "fmt"
 	"reflect"
 	"syscall"
 	"unsafe"
@@ -64,7 +106,9 @@ var (
 	procGetIpStatisticsEx  = modiphlpapi.NewProc("GetIpStatisticsEx")
 	procGetTcpStatisticsEx = modiphlpapi.NewProc("GetTcpStatisticsEx")
 	procGetTcpTable        = modiphlpapi.NewProc("GetTcpTable")
+	procGetTcpTable2       = modiphlpapi.NewProc("GetTcpTable2")
 	procGetTcp6Table       = modiphlpapi.NewProc("GetTcp6Table")
+	procGetTcp6Table2      = modiphlpapi.NewProc("GetTcp6Table2")
 )
 
 const (
@@ -146,8 +190,6 @@ type MIB_TCPSTATS struct {
 	NumConns     uint32
 }
 
-var tcp4RowSize = uint32(unsafe.Sizeof(MIB_TCPROW{}))
-
 func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 	sort := FALSE
 	if sortResults {
@@ -193,9 +235,9 @@ func GetTcpTable(sortResults bool) (table MIB_TCPTABLE, status uint32) {
 		table.Table[i] = MIB_TCPROW{
 			State:      uint32(buf[i].dwState),
 			LocalAddr:  uint32(buf[i].dwLocalAddr),
-			LocalPort:  uint32(buf[i].dwLocalPort),
+			LocalPort:  uint16(buf[i].dwLocalPort)<<8 | uint16(buf[i].dwLocalPort)>>8,
 			RemoteAddr: uint32(buf[i].dwRemoteAddr),
-			RemotePort: uint32(buf[i].dwRemotePort),
+			RemotePort: uint16(buf[i].dwRemotePort)<<8 | uint16(buf[i].dwRemotePort)>>8,
 		}
 	}
 
@@ -212,12 +254,87 @@ type MIB_TCPTABLE struct {
 type MIB_TCPROW struct {
 	State      uint32
 	LocalAddr  uint32
-	LocalPort  uint32
+	LocalPort  uint16
 	RemoteAddr uint32
-	RemotePort uint32
+	RemotePort uint16
 }
 
-var tcp6RowSize = uint32(unsafe.Sizeof(MIB_TCP6ROW{}))
+var tcp4RowSize = uint32(unsafe.Sizeof(MIB_TCPROW{}))
+
+func GetTcpTable2(sortResults bool) (table MIB_TCPTABLE2, status uint32) {
+	sort := FALSE
+	if sortResults {
+		sort = TRUE
+	}
+
+	bufSize := uint32(0)
+	ret, _, _ := procGetTcpTable2.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(&bufSize)),
+		uintptr(sort),
+	)
+
+	if status = uint32(ret); status != ERROR_INSUFFICIENT_BUFFER {
+		return
+	}
+
+	// Allocate our table with a buffer for a few extra rows, just in case
+	tableBuf := C.GetTcpTableBuffer(C.DWORD(bufSize + tcp4Row2Size*20))
+	unsafeTableBuf := unsafe.Pointer(tableBuf)
+	defer C.free(unsafeTableBuf)
+
+	ret, _, _ = procGetTcpTable2.Call(
+		uintptr(unsafeTableBuf),
+		uintptr(unsafe.Pointer(&bufSize)),
+		uintptr(sort),
+	)
+
+	if status = uint32(ret); status != NO_ERROR {
+		return
+	}
+
+	table.NumEntries = uint32(tableBuf.dwNumEntries)
+	table.Table = make([]MIB_TCPROW2, table.NumEntries)
+
+	buf := *(*[]C.MIB_TCPROW2)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(uintptr(unsafeTableBuf) + C.sizeof_struct__MIB_TCPTABLE2)),
+		Len:  int(table.NumEntries),
+		Cap:  int(table.NumEntries),
+	}))
+
+	for i := 0; i < int(table.NumEntries); i++ {
+		table.Table[i] = MIB_TCPROW2{
+			State:        uint32(buf[i].dwState),
+			LocalAddr:    uint32(buf[i].dwLocalAddr),
+			LocalPort:    uint16(buf[i].dwLocalPort)<<8 | uint16(buf[i].dwLocalPort)>>8,
+			RemoteAddr:   uint32(buf[i].dwRemoteAddr),
+			RemotePort:   uint16(buf[i].dwRemotePort)<<8 | uint16(buf[i].dwRemotePort)>>8,
+			Pid:          uint32(buf[i].dwOwningPid),
+			OffloadState: TCP_CONNECTION_OFFLOAD_STATE(buf[i].dwOffloadState),
+		}
+	}
+
+	return
+}
+
+// https://msdn.microsoft.com/en-us/library/bb485772(v=vs.85).aspx
+type MIB_TCPTABLE2 struct {
+	NumEntries uint32
+	Table      []MIB_TCPROW2
+}
+
+// https://msdn.microsoft.com/en-us/library/bb485761(v=vs.85).aspx
+type MIB_TCPROW2 struct {
+	State        uint32
+	LocalAddr    uint32
+	LocalPort    uint16
+	RemoteAddr   uint32
+	RemotePort   uint16
+	Pid          uint32
+	OffloadState TCP_CONNECTION_OFFLOAD_STATE
+}
+
+var tcp4Row2Size = uint32(unsafe.Sizeof(MIB_TCPROW2{}))
 
 func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 	sort := FALSE
@@ -265,10 +382,10 @@ func GetTcp6Table(sortResults bool) (table MIB_TCP6TABLE, status uint32) {
 			State:         MIB_TCP_STATE(buf[i].State),
 			LocalAddr:     []byte(C.GoBytes(unsafe.Pointer(&buf[i].LocalAddr), 16)),
 			LocalScopeId:  uint32(buf[i].dwLocalScopeId),
-			LocalPort:     uint32(buf[i].dwLocalPort),
+			LocalPort:     uint16(buf[i].dwLocalPort)<<8 | uint16(buf[i].dwLocalPort)>>8,
 			RemoteAddr:    []byte(C.GoBytes(unsafe.Pointer(&buf[i].RemoteAddr), 16)),
 			RemoteScopeId: uint32(buf[i].dwRemoteScopeId),
-			RemotePort:    uint32(buf[i].dwRemotePort),
+			RemotePort:    uint16(buf[i].dwRemotePort)<<8 | uint16(buf[i].dwRemotePort)>>8,
 		}
 	}
 
@@ -286,11 +403,92 @@ type MIB_TCP6ROW struct {
 	State         MIB_TCP_STATE
 	LocalAddr     []byte
 	LocalScopeId  uint32
-	LocalPort     uint32
+	LocalPort     uint16
 	RemoteAddr    []byte
 	RemoteScopeId uint32
-	RemotePort    uint32
+	RemotePort    uint16
 }
+
+var tcp6RowSize = uint32(unsafe.Sizeof(MIB_TCP6ROW{}))
+
+func GetTcp6Table2(sortResults bool) (table MIB_TCP6TABLE2, status uint32) {
+	sort := FALSE
+	if sortResults {
+		sort = TRUE
+	}
+
+	bufSize := uint32(0)
+	ret, _, _ := procGetTcp6Table2.Call(
+		uintptr(0),
+		uintptr(unsafe.Pointer(&bufSize)),
+		uintptr(sort),
+	)
+
+	if status = uint32(ret); status != ERROR_INSUFFICIENT_BUFFER {
+		return
+	}
+
+	// Allocate our table with a buffer for a few extra rows, just in case
+	tableBuf := C.GetTcp6Table2Buffer(C.DWORD(bufSize + tcp6Row2Size*20))
+	unsafeTableBuf := unsafe.Pointer(tableBuf)
+	defer C.free(unsafeTableBuf)
+
+	ret, _, _ = procGetTcp6Table2.Call(
+		uintptr(unsafeTableBuf),
+		uintptr(unsafe.Pointer(&bufSize)),
+		uintptr(sort),
+	)
+
+	if status = uint32(ret); status != NO_ERROR {
+		return
+	}
+
+	table.NumEntries = uint32(tableBuf.dwNumEntries)
+	table.Table = make([]MIB_TCP6ROW2, table.NumEntries)
+
+	buf := *(*[]C.MIB_TCP6ROW2)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: uintptr(unsafe.Pointer(uintptr(unsafeTableBuf) + C.sizeof_struct__MIB_TCP6TABLE2)),
+		Len:  int(table.NumEntries),
+		Cap:  int(table.NumEntries),
+	}))
+
+	for i := 0; i < int(table.NumEntries); i++ {
+		table.Table[i] = MIB_TCP6ROW2{
+			LocalAddr:     []byte(C.GoBytes(unsafe.Pointer(&buf[i].LocalAddr), 16)),
+			LocalScopeId:  uint32(buf[i].dwLocalScopeId),
+			LocalPort:     uint16(buf[i].dwLocalPort)<<8 | uint16(buf[i].dwLocalPort)>>8,
+			RemoteAddr:    []byte(C.GoBytes(unsafe.Pointer(&buf[i].RemoteAddr), 16)),
+			RemoteScopeId: uint32(buf[i].dwRemoteScopeId),
+			RemotePort:    uint16(buf[i].dwRemotePort)<<8 | uint16(buf[i].dwRemotePort)>>8,
+			State:         MIB_TCP_STATE(buf[i].State),
+			Pid:           uint32(buf[i].dwOwningPid),
+			OffloadState:  TCP_CONNECTION_OFFLOAD_STATE(buf[i].dwOffloadState),
+		}
+	}
+
+	return
+}
+
+// https://msdn.microsoft.com/en-us/library/bb485749(v=vs.85).aspx
+type MIB_TCP6TABLE2 struct {
+	NumEntries uint32
+	Table      []MIB_TCP6ROW2
+}
+
+// https://msdn.microsoft.com/en-us/library/bb485739(v=vs.85).aspx
+type MIB_TCP6ROW2 struct {
+	LocalAddr     []byte
+	LocalScopeId  uint32
+	LocalPort     uint16
+	RemoteAddr    []byte
+	RemoteScopeId uint32
+	RemotePort    uint16
+	State         MIB_TCP_STATE
+	Pid           uint32
+	OffloadState  TCP_CONNECTION_OFFLOAD_STATE
+}
+
+var tcp6Row2Size = uint32(unsafe.Sizeof(MIB_TCP6ROW2{}))
 
 type MIB_TCP_STATE uint32
 
@@ -307,4 +505,14 @@ const (
 	MIB_TCP_STATE_LAST_ACK   = 10
 	MIB_TCP_STATE_TIME_WAIT  = 11
 	MIB_TCP_STATE_DELETE_TCB = 12
+)
+
+type TCP_CONNECTION_OFFLOAD_STATE uint32
+
+const (
+	TCP_OFFLOAD_STATE_INHOST     = 0
+	TCP_OFFLOAD_STATE_OFFLOADING = 1
+	TCP_OFFLOAD_STATE_OFFLOADED  = 2
+	TCP_OFFLOAD_STATE_UPLOADING  = 3
+	TCP_OFFLOAD_STATE_MAX        = 4
 )
