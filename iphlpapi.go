@@ -94,7 +94,6 @@ MIB_TCPTABLE2* GetTcpTable2Buffer(DWORD buffersize){
 import "C"
 
 import (
-	//      "fmt"
 	"reflect"
 	"syscall"
 	"unsafe"
