@@ -212,6 +212,7 @@ type (
 	LPARAM          uintptr
 	LPCVOID         unsafe.Pointer
 	LRESULT         uintptr
+	LUID            uint64
 	PVOID           unsafe.Pointer
 	QPC_TIME        uint64
 	ULONG_PTR       uintptr

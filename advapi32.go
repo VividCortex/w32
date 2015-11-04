@@ -4,6 +4,22 @@
 
 package w32
 
+/*
+#include <windows.h>
+
+typedef struct _X_LUID_AND_ATTRIBUTES {
+  DWORD               LuidLow;
+  DWORD               LuidHigh;
+  DWORD               Attributes;
+} X_LUID_AND_ATTRIBUTES;
+
+typedef struct _X_TOKEN_PRIVILEGES {
+  DWORD               PrivilegeCount;
+  //X_LUID_AND_ATTRIBUTES Privileges[ANYSIZE_ARRAY];
+} X_TOKEN_PRIVILEGES;
+*/
+import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -20,18 +36,21 @@ var (
 	procRegGetValue    = modadvapi32.NewProc("RegGetValueW")
 	procRegEnumKeyEx   = modadvapi32.NewProc("RegEnumKeyExW")
 	//	procRegSetKeyValue     = modadvapi32.NewProc("RegSetKeyValueW")
-	procRegSetValueEx      = modadvapi32.NewProc("RegSetValueExW")
-	procRegDeleteKeyValue  = modadvapi32.NewProc("RegDeleteKeyValueW")
-	procRegDeleteValue     = modadvapi32.NewProc("RegDeleteValueW")
-	procRegDeleteTree      = modadvapi32.NewProc("RegDeleteTreeW")
-	procOpenEventLog       = modadvapi32.NewProc("OpenEventLogW")
-	procReadEventLog       = modadvapi32.NewProc("ReadEventLogW")
-	procCloseEventLog      = modadvapi32.NewProc("CloseEventLog")
-	procOpenSCManager      = modadvapi32.NewProc("OpenSCManagerW")
-	procCloseServiceHandle = modadvapi32.NewProc("CloseServiceHandle")
-	procOpenService        = modadvapi32.NewProc("OpenServiceW")
-	procStartService       = modadvapi32.NewProc("StartServiceW")
-	procControlService     = modadvapi32.NewProc("ControlService")
+	procRegSetValueEx         = modadvapi32.NewProc("RegSetValueExW")
+	procRegDeleteKeyValue     = modadvapi32.NewProc("RegDeleteKeyValueW")
+	procRegDeleteValue        = modadvapi32.NewProc("RegDeleteValueW")
+	procRegDeleteTree         = modadvapi32.NewProc("RegDeleteTreeW")
+	procOpenEventLog          = modadvapi32.NewProc("OpenEventLogW")
+	procReadEventLog          = modadvapi32.NewProc("ReadEventLogW")
+	procCloseEventLog         = modadvapi32.NewProc("CloseEventLog")
+	procOpenSCManager         = modadvapi32.NewProc("OpenSCManagerW")
+	procCloseServiceHandle    = modadvapi32.NewProc("CloseServiceHandle")
+	procOpenService           = modadvapi32.NewProc("OpenServiceW")
+	procStartService          = modadvapi32.NewProc("StartServiceW")
+	procControlService        = modadvapi32.NewProc("ControlService")
+	procOpenProcessToken      = modadvapi32.NewProc("OpenProcessToken")
+	procLookupPrivilegeValue  = modadvapi32.NewProc("LookupPrivilegeValueW")
+	procAdjustTokenPrivileges = modadvapi32.NewProc("AdjustTokenPrivileges")
 )
 
 func RegCreateKey(hKey HKEY, subKey string) HKEY {
@@ -377,6 +396,96 @@ func ControlService(hService HANDLE, dwControl uint32, lpServiceStatus *SERVICE_
 		uintptr(hService),
 		uintptr(dwControl),
 		uintptr(unsafe.Pointer(lpServiceStatus)))
+
+	return ret != 0
+}
+
+const (
+	TOKEN_ASSIGN_PRIMARY    = 0x0001 // Required to attach a primary token to a process.
+	TOKEN_DUPLICATE         = 0x0002 // Required to duplicate an access token.
+	TOKEN_IMPERSONATE       = 0x0004 // Required to attach an impersonation access token to a process.
+	TOKEN_QUERY             = 0x0008 // Required to query an access token.
+	TOKEN_QUERY_SOURCE      = 0x0010 // Required to query the source of an access token.
+	TOKEN_ADJUST_PRIVILEGES = 0x0020 // Required to enable or disable the privileges in an access token.
+	TOKEN_ADJUST_GROUPS     = 0x0040 // Required to adjust the attributes of the groups in an access token.
+	TOKEN_ADJUST_DEFAULT    = 0x0080 // Required to change the default owner, primary group, or DACL of an access token.
+	TOKEN_ADJUST_SESSIONID  = 0x0100 // Required to adjust the session ID of an access token. The SE_TCB_NAME privilege is required.
+	TOKEN_EXECUTE           = SAR_EXECUTE | TOKEN_IMPERSONATE
+	TOKEN_READ              = SAR_READ | TOKEN_QUERY
+	TOKEN_WRITE             = SAR_WRITE | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT
+	TOKEN_ALL_ACCESS        = SAR_REQUIRED | TOKEN_ASSIGN_PRIMARY |
+		TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_QUERY_SOURCE |
+		TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT |
+		TOKEN_ADJUST_SESSIONID
+)
+
+func OpenProcessToken(hProcess HANDLE, dwDesiredAccess uint32, lpTokenHandle *HANDLE) bool {
+	if lpTokenHandle == nil {
+		panic("OpenProcessToken: lpTokenHandle cannot be nil")
+	}
+	*lpTokenHandle = 0
+	ret, _, _ := procOpenProcessToken.Call(
+		uintptr(hProcess),
+		uintptr(dwDesiredAccess),
+		uintptr(unsafe.Pointer(lpTokenHandle)))
+
+	return ret != 0 && *lpTokenHandle != 0
+}
+
+const ( // Privilege Constants - https://msdn.microsoft.com/en-us/library/windows/desktop/bb530716(v=vs.85).aspx
+	SE_DEBUG_NAME = "SeDebugPrivilege" // Required to debug and adjust the memory of a process owned by another account.
+)
+
+func LookupPrivilegeValue(lpSystemName string, lpName string, lpLUID *LUID) bool {
+	if lpLUID == nil {
+		panic("LookupPrivilegeValue: lpLUID cannot be nil")
+	}
+	*lpLUID = 0
+	ret, _, _ := procLookupPrivilegeValue.Call(
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpSystemName))),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpName))),
+		uintptr(unsafe.Pointer(lpLUID)))
+
+	return ret != 0 && *lpLUID != 0
+}
+
+type LUID_AND_ATTRIBUTES struct {
+	Luid       LUID
+	Attributes uint32
+}
+
+type TOKEN_PRIVILEGES struct {
+	PrivilegeCount uint32
+	Privileges     []LUID_AND_ATTRIBUTES
+}
+
+const ( // attributes of a privilege
+	SE_PRIVILEGE_ENABLED_BY_DEFAULT = 0x00000001
+	SE_PRIVILEGE_ENABLED            = 0x00000002
+	SE_PRIVILEGE_REMOVED            = 0x00000004
+	SE_PRIVILEGE_USED_FOR_ACCESS    = 0x80000000
+)
+
+func AdjustTokenPrivileges(hToken HANDLE, disableAllPrivileges bool, newState TOKEN_PRIVILEGES) bool {
+	if C.sizeof_struct__X_TOKEN_PRIVILEGES != 4 || C.sizeof_struct__X_LUID_AND_ATTRIBUTES != 12 {
+		panic(fmt.Sprintf("AdjustTokenPrivileges: sizeof(TOKEN_PRIVILEGES)=%d sizeof(LUID_AND_ATTRIBUTES)=%d",
+			C.sizeof_struct__X_TOKEN_PRIVILEGES, C.sizeof_struct__X_LUID_AND_ATTRIBUTES))
+	}
+	priv := make([]uint32, (C.sizeof_struct__X_TOKEN_PRIVILEGES+newState.PrivilegeCount*C.sizeof_struct__X_LUID_AND_ATTRIBUTES)/4)
+	priv[0] = newState.PrivilegeCount
+	for i := uint32(0); i < newState.PrivilegeCount; i++ {
+		priv[1+i*3+0] = uint32(newState.Privileges[i].Luid)
+		priv[1+i*3+1] = uint32(newState.Privileges[i].Luid >> 32)
+		priv[1+i*3+2] = newState.Privileges[i].Attributes
+	}
+
+	ret, _, _ := procAdjustTokenPrivileges.Call(
+		uintptr(hToken),
+		uintptr(BoolToBOOL(disableAllPrivileges)),
+		uintptr(unsafe.Pointer(&priv[0])),
+		uintptr(0),
+		uintptr(0),
+		uintptr(0))
 
 	return ret != 0
 }
