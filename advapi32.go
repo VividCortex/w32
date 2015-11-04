@@ -420,6 +420,9 @@ const (
 )
 
 func OpenProcessToken(hProcess HANDLE, dwDesiredAccess uint32, lpTokenHandle *HANDLE) bool {
+	if lpTokenHandle == nil {
+		panic("OpenProcessToken: lpTokenHandle cannot be nil")
+	}
 	*lpTokenHandle = 0
 	ret, _, _ := procOpenProcessToken.Call(
 		uintptr(hProcess),
@@ -434,6 +437,9 @@ const ( // Privilege Constants - https://msdn.microsoft.com/en-us/library/window
 )
 
 func LookupPrivilegeValue(lpSystemName string, lpName string, lpLUID *LUID) bool {
+	if lpLUID == nil {
+		panic("LookupPrivilegeValue: lpLUID cannot be nil")
+	}
 	*lpLUID = 0
 	ret, _, _ := procLookupPrivilegeValue.Call(
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(lpSystemName))),
@@ -461,11 +467,9 @@ const ( // attributes of a privilege
 )
 
 func AdjustTokenPrivileges(hToken HANDLE, disableAllPrivileges bool, newState TOKEN_PRIVILEGES) bool {
-	if C.sizeof_struct__X_TOKEN_PRIVILEGES != 4 {
-		panic("C.sizeof_struct__X_TOKEN_PRIVILEGES!!!")
-	}
-	if C.sizeof_struct__X_LUID_AND_ATTRIBUTES != 12 {
-		panic("C.sizeof_struct__X_LUID_AND_ATTRIBUTES!!!")
+	if C.sizeof_struct__X_TOKEN_PRIVILEGES != 4 || C.sizeof_struct__X_LUID_AND_ATTRIBUTES != 12 {
+		panic(fmt.Sprintf("AdjustTokenPrivileges: sizeof(TOKEN_PRIVILEGES)=%d sizeof(LUID_AND_ATTRIBUTES)=%d",
+			C.sizeof_struct__X_TOKEN_PRIVILEGES, C.sizeof_struct__X_LUID_AND_ATTRIBUTES))
 	}
 	priv := make([]uint32, (C.sizeof_struct__X_TOKEN_PRIVILEGES+newState.PrivilegeCount*C.sizeof_struct__X_LUID_AND_ATTRIBUTES)/4)
 	priv[0] = newState.PrivilegeCount
