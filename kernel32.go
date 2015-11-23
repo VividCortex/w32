@@ -14,6 +14,7 @@ var (
 	modkernel32 = syscall.NewLazyDLL("kernel32.dll")
 
 	procGetModuleHandle            = modkernel32.NewProc("GetModuleHandleW")
+	procGetVersion                 = modkernel32.NewProc("GetVersion")
 	procMulDiv                     = modkernel32.NewProc("MulDiv")
 	procGetConsoleWindow           = modkernel32.NewProc("GetConsoleWindow")
 	procGetCurrentProcess          = modkernel32.NewProc("GetCurrentProcess")
@@ -52,6 +53,9 @@ var (
 	procWaitForSingleObject        = modkernel32.NewProc("WaitForSingleObject")
 	procQueryFullProcessImageName  = modkernel32.NewProc("QueryFullProcessImageNameW")
 	procReadProcessMemory          = modkernel32.NewProc("ReadProcessMemory")
+	procLockFile                   = modkernel32.NewProc("LockFile")
+	procLockFileEx                 = modkernel32.NewProc("LockFileEx")
+	procUnlockFile                 = modkernel32.NewProc("UnlockFile")
 )
 
 func GetModuleHandle(modulename string) HINSTANCE {
@@ -63,6 +67,11 @@ func GetModuleHandle(modulename string) HINSTANCE {
 	}
 	ret, _, _ := procGetModuleHandle.Call(mn)
 	return HINSTANCE(ret)
+}
+
+func GetVersion() uint32 {
+	ret, _, _ := procGetVersion.Call()
+	return uint32(ret)
 }
 
 func MulDiv(number, numerator, denominator int) int {
@@ -450,9 +459,8 @@ const (
 	WAIT_FAILED    = 0xFFFFFFFF
 )
 
-// WaitForSingleObject waits for the object to be signaled.
-// Returns true if the object was signaled, false otherwise.
-// It returns an error when the wait fails for a reason other than the object not being signaled.
+// WaitForSingleObject exits when the object is signaled, or an error occurs.
+// Returns one of the WAIT_ consts.
 func WaitForSingleObject(object HANDLE, msWait uint32) uint32 {
 	switch res, _, _ := procWaitForSingleObject.Call(uintptr(object), uintptr(msWait)); res {
 	case WAIT_SIGNALED, WAIT_ABANDONED, WAIT_TIMEOUT:
@@ -460,4 +468,38 @@ func WaitForSingleObject(object HANDLE, msWait uint32) uint32 {
 	default:
 		return WAIT_FAILED
 	}
+}
+
+func LockFile(hFile HANDLE, fileOffset uint64, numberOfBytesToLock uint64) bool {
+	ret, _, _ := procLockFile.Call(
+		uintptr(hFile),
+		uintptr(fileOffset&0xFFFFFFFF),
+		uintptr(fileOffset>>32),
+		uintptr(numberOfBytesToLock&0xFFFFFFFF),
+		uintptr(numberOfBytesToLock>>32))
+	return ret != 0
+}
+
+const LOCKFILE_EXCLUSIVE_LOCK = 0x00000002
+
+func LockFileEx(hFile HANDLE, fileOffset uint64, numberOfBytesToLock uint64) bool {
+	lpvo := &syscall.Overlapped{Offset: uint32(fileOffset), OffsetHigh: uint32(fileOffset >> 32)}
+	ret, _, _ := procLockFileEx.Call(
+		uintptr(hFile),
+		uintptr(LOCKFILE_EXCLUSIVE_LOCK),
+		uintptr(0),
+		uintptr(numberOfBytesToLock&0xFFFFFFFF),
+		uintptr(numberOfBytesToLock>>32),
+		uintptr(unsafe.Pointer(lpvo)))
+	return ret != 0
+}
+
+func UnlockFile(hFile HANDLE, fileOffset uint64, numberOfBytesToUnlock uint64) bool {
+	ret, _, _ := procUnlockFile.Call(
+		uintptr(hFile),
+		uintptr(fileOffset&0xFFFFFFFF),
+		uintptr(fileOffset>>32),
+		uintptr(numberOfBytesToUnlock&0xFFFFFFFF),
+		uintptr(numberOfBytesToUnlock>>32))
+	return ret != 0
 }
