@@ -470,6 +470,7 @@ func WaitForSingleObject(object HANDLE, msWait uint32) uint32 {
 	}
 }
 
+// LockFile will fail immediately (ret false) when it's not able to acquire lock.
 func LockFile(hFile HANDLE, fileOffset uint64, numberOfBytesToLock uint64) bool {
 	ret, _, _ := procLockFile.Call(
 		uintptr(hFile),
@@ -482,6 +483,8 @@ func LockFile(hFile HANDLE, fileOffset uint64, numberOfBytesToLock uint64) bool 
 
 const LOCKFILE_EXCLUSIVE_LOCK = 0x00000002
 
+// LockFileEx currently only works in exclusive + blocking mode. It won't return
+// until lock is acquired (ret true) or an error occurred (ret false).
 func LockFileEx(hFile HANDLE, fileOffset uint64, numberOfBytesToLock uint64) bool {
 	lpvo := &syscall.Overlapped{Offset: uint32(fileOffset), OffsetHigh: uint32(fileOffset >> 32)}
 	ret, _, _ := procLockFileEx.Call(
