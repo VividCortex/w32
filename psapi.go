@@ -60,4 +60,5 @@ type PROCESS_MEMORY_COUNTERS struct {
 	QuotaNonPagedPoolUsage     uintptr
 	PagefileUsage              uintptr
 	PeakPagefileUsage          uintptr
+	PrivateUsage               uintptr
 }
